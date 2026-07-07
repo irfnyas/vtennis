@@ -370,6 +370,8 @@
         // Initialize default selection UI
         selectShot('normal');
 
+        let pingInterval;
+
         function connect() {
             if (!roomId) {
                 alert('Please enter a Room ID');
@@ -386,8 +388,23 @@
                 statusDiv.innerHTML = `ONLINE<br><span style='font-size:9px;color:#aaa;'>Room: ${roomId}</span>`;
                 statusDiv.style.color = '#00e676';
                 checkAndHideOverlay();
+                
+                // Send immediate connect notification to let Unity know we are here
+                ws.send(JSON.stringify({ player: playerRole, type: 'connect' }));
+
+                // Start periodic ping heartbeat to maintain connection status
+                if (pingInterval) clearInterval(pingInterval);
+                pingInterval = setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ player: playerRole, type: 'ping' }));
+                    }
+                }, 2000);
             };
             ws.onclose = () => {
+                if (pingInterval) {
+                    clearInterval(pingInterval);
+                    pingInterval = null;
+                }
                 statusDiv.innerHTML = `OFFLINE<br><span style='font-size:9px;color:#aaa;'>Room: ${roomId}</span>`;
                 statusDiv.style.color = '#ff5555';
                 if (isStarted) {
