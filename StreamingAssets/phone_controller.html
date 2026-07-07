@@ -231,7 +231,7 @@
             
             <div style="width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;">
                 <label style="font-size: 11px; font-weight: 800; opacity: 0.5; letter-spacing: 1.5px;">ROOM ID</label>
-                <input type="text" id="roomInput" placeholder="Enter Room Code" style="width: 100%; box-sizing: border-box; padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: #fff; font-size: 18px; text-align: center; font-weight: 800; letter-spacing: 2px; outline: none; transition: border 0.3s;" onfocus="this.style.borderColor='rgba(0, 230, 118, 0.5)';" onblur="this.style.borderColor='rgba(255,255,255,0.1)';">
+                <input type="text" inputmode="numeric" pattern="[0-9]*" id="roomInput" placeholder="Enter Room Code" style="width: 100%; box-sizing: border-box; padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: #fff; font-size: 18px; text-align: center; font-weight: 800; letter-spacing: 2px; outline: none; transition: border 0.3s;" onfocus="this.style.borderColor='rgba(0, 230, 118, 0.5)';" onblur="this.style.borderColor='rgba(255,255,255,0.1)';">
             </div>
 
             <div style="width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 5px;">
@@ -287,6 +287,13 @@
         const roomInput = document.getElementById('roomInput');
         const roleP1Btn = document.getElementById('roleP1Btn');
         const roleP2Btn = document.getElementById('roleP2Btn');
+
+        // Dismiss mobile keyboard on Enter
+        roomInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                roomInput.blur();
+            }
+        });
 
         const nodes = {
             'drop': document.getElementById('card-drop'),
@@ -370,6 +377,8 @@
         // Initialize default selection UI
         selectShot('normal');
 
+        let pingInterval;
+
         function connect() {
             if (!roomId) {
                 alert('Please enter a Room ID');
@@ -386,8 +395,23 @@
                 statusDiv.innerHTML = `ONLINE<br><span style='font-size:9px;color:#aaa;'>Room: ${roomId}</span>`;
                 statusDiv.style.color = '#00e676';
                 checkAndHideOverlay();
+                
+                // Send immediate connect notification to let Unity know we are here
+                ws.send(JSON.stringify({ player: playerRole, type: 'connect' }));
+
+                // Start periodic ping heartbeat to maintain connection status
+                if (pingInterval) clearInterval(pingInterval);
+                pingInterval = setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ player: playerRole, type: 'ping' }));
+                    }
+                }, 2000);
             };
             ws.onclose = () => {
+                if (pingInterval) {
+                    clearInterval(pingInterval);
+                    pingInterval = null;
+                }
                 statusDiv.innerHTML = `OFFLINE<br><span style='font-size:9px;color:#aaa;'>Room: ${roomId}</span>`;
                 statusDiv.style.color = '#ff5555';
                 if (isStarted) {
