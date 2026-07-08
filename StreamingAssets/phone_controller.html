@@ -221,6 +221,65 @@
             z-index: 5;
             opacity: 0;
         }
+
+        .pause-btn {
+            position: absolute;
+            bottom: 24px;
+            background: transparent;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.7);
+            padding: 10px 32px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            cursor: pointer;
+            z-index: 8;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            outline: none;
+        }
+        .pause-btn:active {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.8);
+            color: #fff;
+            transform: scale(0.95);
+        }
+
+        .snackbar {
+            visibility: hidden;
+            min-width: 200px;
+            background-color: rgba(13, 13, 17, 0.95);
+            color: #fff;
+            text-align: center;
+            border-radius: 20px;
+            padding: 12px 24px;
+            position: absolute;
+            z-index: 20;
+            bottom: 90px;
+            left: 50%;
+            transform: translate(-50%, 0);
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.15);
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s, visibility 0.3s;
+            pointer-events: none;
+        }
+        .snackbar.show {
+            visibility: visible;
+            opacity: 1;
+            transform: translate(-50%, -10px);
+        }
+
+        .menu-btn {
+            transition: all 0.2s ease;
+        }
+        .menu-btn:active {
+            transform: scale(0.95);
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -232,6 +291,7 @@
             <div style="width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 20px;">
                 <label style="font-size: 11px; font-weight: 800; opacity: 0.5; letter-spacing: 1.5px;">ROOM ID</label>
                 <input type="text" inputmode="numeric" pattern="[0-9]*" id="roomInput" placeholder="Enter Room Code" style="width: 100%; box-sizing: border-box; padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: #fff; font-size: 18px; text-align: center; font-weight: 800; letter-spacing: 2px; outline: none; transition: border 0.3s;" onfocus="this.style.borderColor='rgba(0, 230, 118, 0.5)';" onblur="this.style.borderColor='rgba(255,255,255,0.1)';">
+                <span id="roomError" style="color: #ff5555; font-size: 12px; font-weight: 700; width: 100%; text-align: center; display: none; margin-top: 4px;">Room not found</span>
             </div>
 
             <button class='start-btn' id='startBtn' style="width: 100%; height: 52px; border-radius: 26px; font-size: 18px; font-weight: 900; letter-spacing: 2px; border: none; cursor: pointer; background: linear-gradient(135deg, #00e676 0%, #00b0ff 100%); color: #000; box-shadow: 0 8px 25px rgba(0, 230, 118, 0.25); transition: all 0.2s;">CONNECT</button>
@@ -263,6 +323,22 @@
     <!-- Sliding handle indicator -->
     <div class='drag-tracker' id='tracker'></div>
 
+    <!-- Escape Overlay -->
+    <div class='overlay-container' id='escapeOverlay' style="display: none; opacity: 0; background: rgba(13, 13, 17, 0.95); z-index: 15;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 20px; background: rgba(21, 21, 34, 0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 35px 30px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.08); width: 85%; max-width: 340px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            <h2 style="margin: 0 0 10px 0; font-size: 24px; font-weight: 400; letter-spacing: 2px; color: #fff; text-align: center;">Game Paused</h2>
+            <button class='menu-btn' id='continueBtn' style="width: 100%; height: 50px; border-radius: 25px; font-size: 16px; font-weight: 900; letter-spacing: 1.5px; border: none; cursor: pointer; background: #ffffff; color: #000; box-shadow: 0 8px 20px rgba(255, 255, 255, 0.2); transition: all 0.2s;">Continue</button>
+            <button class='menu-btn' id='restartBtn' style="width: 100%; height: 50px; border-radius: 25px; font-size: 16px; font-weight: 900; letter-spacing: 1.5px; border: 2px solid #ffffff; cursor: pointer; background: transparent; color: #ffffff; transition: all 0.2s;">Restart</button>
+            <button class='menu-btn' id='backHomeBtn' style="width: 100%; height: 50px; border-radius: 25px; font-size: 16px; font-weight: 900; letter-spacing: 1.5px; border: 2px solid #ffffff; cursor: pointer; background: transparent; color: #ffffff; transition: all 0.2s;">Back to Home</button>
+        </div>
+    </div>
+
+    <!-- Pause Button -->
+    <button id="pauseBtn" class="pause-btn">Pause</button>
+
+    <!-- Snackbar tooltip -->
+    <div id="snackbar" class="snackbar">Hold to pause game</div>
+
     <script>
         // --- CONFIGURATION ---
         const PIESOCKET_API_KEY = 'WanovP0lqkqTuDhoK6slIqEJ7pis5Vc1XUKBWX7g';
@@ -275,8 +351,23 @@
         const gestureZone = document.getElementById('gestureZone');
         const tracker = document.getElementById('tracker');
         const playerBadge = document.getElementById('playerBadge');
-        
         const roomInput = document.getElementById('roomInput');
+
+        const pauseBtn = document.getElementById('pauseBtn');
+        const escapeOverlay = document.getElementById('escapeOverlay');
+        const continueBtn = document.getElementById('continueBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const backHomeBtn = document.getElementById('backHomeBtn');
+        const snackbar = document.getElementById('snackbar');
+        const roomError = document.getElementById('roomError');
+
+        function showRoomError(msg) {
+            roomError.innerText = msg || "Room not found";
+            roomError.style.display = 'block';
+        }
+        function hideRoomError() {
+            roomError.style.display = 'none';
+        }
 
         // Dismiss mobile keyboard on Enter
         roomInput.addEventListener('keydown', (e) => {
@@ -284,6 +375,8 @@
                 roomInput.blur();
             }
         });
+        roomInput.addEventListener('input', hideRoomError);
+        roomInput.addEventListener('focus', hideRoomError);
 
         const nodes = {
             'drop': document.getElementById('card-drop'),
@@ -295,6 +388,7 @@
         let selectedShot = '';
         let ws;
         let isStarted = false;
+        let connectionTimeout;
         let isMotionActive = false;
         let lastSwingTime = 0;
         const SWING_THRESHOLD = 18;
@@ -363,7 +457,7 @@
 
         function connect() {
             if (!roomId) {
-                alert('Please enter a Room ID');
+                showRoomError("Room not found");
                 return;
             }
 
@@ -373,6 +467,17 @@
             const wsUrl = `wss://${PIESOCKET_CLUSTER_ID}.piesocket.com/v3/tennis-room-${roomId}?api_key=${PIESOCKET_API_KEY}`;
             
             ws = new WebSocket(wsUrl);
+            
+            // Set 2 seconds connection timeout to check if Room exists/replies
+            clearTimeout(connectionTimeout);
+            connectionTimeout = setTimeout(() => {
+                if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) && !playerRole) {
+                    isStarted = false;
+                    ws.close();
+                    showRoomError("Room not found");
+                }
+            }, 2000);
+
             ws.onopen = () => {
                 // Send connect message with clientId to let Unity assign the role
                 ws.send(JSON.stringify({ type: 'connect', clientId: clientId }));
@@ -381,6 +486,7 @@
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'assign_role' && data.clientId === clientId) {
+                        clearTimeout(connectionTimeout);
                         if (data.role === 'p1' || data.role === 'p2') {
                             setRole(data.role);
                             statusDiv.innerHTML = `ONLINE<br><span style='font-size:9px;color:#aaa;'>Room: ${roomId}</span>`;
@@ -411,6 +517,7 @@
                 }
             };
             ws.onclose = () => {
+                clearTimeout(connectionTimeout);
                 if (pingInterval) {
                     clearInterval(pingInterval);
                     pingInterval = null;
@@ -422,11 +529,15 @@
                 startOverlay.style.display = 'flex';
                 startOverlay.style.opacity = 1;
 
-                if (isStarted) {
+                if (!playerRole && isStarted) {
+                    isStarted = false;
+                    showRoomError("Room not found");
+                } else if (isStarted) {
                     setTimeout(connect, 2000);
                 }
             };
             ws.onerror = (err) => {
+                clearTimeout(connectionTimeout);
                 console.error('ws error', err);
             };
         }
@@ -552,12 +663,107 @@
             e.preventDefault();
             roomId = roomInput.value.trim();
             if (!roomId) {
-                alert('Please enter a Room ID');
+                showRoomError("Room not found");
                 return;
             }
+            playerRole = ''; // Reset playerRole on new connection attempt
             isStarted = true;
             requestMotionPermission();
             connect();
+        });
+
+        // --- PAUSE & ESCAPE MENU FUNCTIONALITY ---
+        let pauseTimer;
+        let isLongPress = false;
+        let snackbarTimeout;
+
+        function showTooltip(message) {
+            snackbar.innerText = message || "Hold to pause game";
+            snackbar.classList.add('show');
+            clearTimeout(snackbarTimeout);
+            snackbarTimeout = setTimeout(() => {
+                snackbar.classList.remove('show');
+            }, 2000);
+        }
+
+        function openEscapeMenu() {
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+            escapeOverlay.style.display = 'flex';
+            // Force layout reflow
+            escapeOverlay.offsetHeight;
+            escapeOverlay.style.opacity = 1;
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ player: playerRole, type: 'pause' }));
+            }
+        }
+
+        function closeEscapeMenu() {
+            escapeOverlay.style.opacity = 0;
+            setTimeout(() => {
+                escapeOverlay.style.display = 'none';
+            }, 400);
+        }
+
+        // Pause Button Long Press detection
+        pauseBtn.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            if (!isStarted) return;
+            isLongPress = false;
+            pauseTimer = setTimeout(() => {
+                isLongPress = true;
+                openEscapeMenu();
+            }, 800);
+        });
+
+        pauseBtn.addEventListener('pointerup', (e) => {
+            e.stopPropagation();
+            if (!isStarted) return;
+            clearTimeout(pauseTimer);
+            if (!isLongPress) {
+                showTooltip("Hold to pause game");
+            }
+        });
+
+        pauseBtn.addEventListener('pointercancel', (e) => {
+            clearTimeout(pauseTimer);
+        });
+
+        pauseBtn.addEventListener('pointerleave', (e) => {
+            clearTimeout(pauseTimer);
+        });
+
+        // Menu Overlay Action Handlers
+        continueBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeEscapeMenu();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ player: playerRole, type: 'continue' }));
+            }
+        });
+
+        restartBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeEscapeMenu();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ player: playerRole, type: 'restart' }));
+            }
+        });
+
+        backHomeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeEscapeMenu();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ player: playerRole, type: 'backhome' }));
+            }
+            
+            // Go back to landing screen on phone controller
+            isStarted = false;
+            if (ws) {
+                ws.close();
+            }
         });
     </script>
 </body>
