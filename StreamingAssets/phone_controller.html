@@ -455,12 +455,27 @@
 
         let pingInterval;
 
+        function disableInputs() {
+            startBtn.disabled = true;
+            startBtn.style.opacity = 0.5;
+            roomInput.disabled = true;
+            roomInput.style.opacity = 0.5;
+        }
+
+        function enableInputs() {
+            startBtn.disabled = false;
+            startBtn.style.opacity = 1;
+            roomInput.disabled = false;
+            roomInput.style.opacity = 1;
+        }
+
         function connect() {
             if (!roomId) {
                 showRoomError("Room not found");
                 return;
             }
 
+            disableInputs();
             statusDiv.innerText = 'Connecting...';
             statusDiv.style.color = '#ffd740';
 
@@ -468,15 +483,16 @@
             
             ws = new WebSocket(wsUrl);
             
-            // Set 6 seconds connection timeout to check if Room exists/replies
+            // Set 10 seconds connection timeout to check if Room exists/replies
             clearTimeout(connectionTimeout);
             connectionTimeout = setTimeout(() => {
                 if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) && !playerRole) {
                     isStarted = false;
                     ws.close();
+                    enableInputs();
                     showRoomError("Room not found");
                 }
-            }, 6000);
+            }, 10000);
 
             ws.onopen = () => {
                 // Send connect message with clientId to let Unity assign the role
@@ -496,6 +512,7 @@
                             startOverlay.style.opacity = 0;
                             setTimeout(() => {
                                 startOverlay.style.display = 'none';
+                                enableInputs(); // Restore inputs when overlay is closed
                             }, 400);
 
                             // Start periodic ping heartbeat to maintain connection status
@@ -509,6 +526,7 @@
                             alert('Room is full! Please try another room ID.');
                             statusDiv.innerText = 'OFFLINE';
                             statusDiv.style.color = '#ff5555';
+                            enableInputs();
                             ws.close();
                         }
                     }
@@ -528,6 +546,7 @@
                 // Show overlay again if disconnected
                 startOverlay.style.display = 'flex';
                 startOverlay.style.opacity = 1;
+                enableInputs();
 
                 if (!playerRole && isStarted) {
                     isStarted = false;
@@ -538,6 +557,7 @@
             };
             ws.onerror = (err) => {
                 clearTimeout(connectionTimeout);
+                enableInputs();
                 console.error('ws error', err);
             };
         }
