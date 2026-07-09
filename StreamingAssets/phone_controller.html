@@ -468,7 +468,7 @@
             
             ws = new WebSocket(wsUrl);
             
-            // Set 2 seconds connection timeout to check if Room exists/replies
+            // Set 6 seconds connection timeout to check if Room exists/replies
             clearTimeout(connectionTimeout);
             connectionTimeout = setTimeout(() => {
                 if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) && !playerRole) {
@@ -476,7 +476,7 @@
                     ws.close();
                     showRoomError("Room not found");
                 }
-            }, 2000);
+            }, 6000);
 
             ws.onopen = () => {
                 // Send connect message with clientId to let Unity assign the role
